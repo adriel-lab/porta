@@ -1,0 +1,97 @@
+Deve listar um calendario com as datas pedidas, pegar os dias de trabalho dos porteiros, os dias de culto da igreja e marcar o nome dos porteiros de forma aleatoria nas duas portas da igreja.
+
+Se houver apenas um porteiro disponível com o dia de trabalho correspondente ao dia de culto, ele seja exibido.
+Se houver mais de um porteiro disponível, escolher aleatoriamente dois para exibir.
+Verificar se o dia de trabalho do porteiro coincide com o dia de culto antes de atribuir os porteiros.
+
+
+muito bom esta otimo, Agora eu quero separar o formulario do codigo que gera e deixar em 2 paginas a pagina do formulario ai mandar o post para a pagina que gera os calendarios
+
+
+    function atribuirPorteiros($igreja, $porteiros, $percentualAleatoriedade)
+    {
+        $atribuicoes = [];
+        $diasCulto = $igreja['dias_culto'];
+    
+        // Definir dias onde serão atribuídos 3 porteiros
+        $diasTresPorteiros = ['Monday', 'Tuesday', 'Wednesday', 'Friday', 'Saturday'];
+    
+        foreach ($diasCulto as $diaCulto) {
+            $atribuicoes[$diaCulto] = [];
+    
+            // Seleciona porteiros que têm o dia de trabalho correspondente ao dia de culto ou "All"
+            $porteirosDisponiveis = [];
+            foreach ($porteiros as $porteiro) {
+                if (in_array($diaCulto, $porteiro['dias_trabalho']) || in_array('All', $porteiro['dias_trabalho'])) {
+                    $porteirosDisponiveis[] = $porteiro['nome'];
+                }
+            }
+    
+            // Armazena os porteiros disponíveis para o dia de culto
+            if (!empty($porteirosDisponiveis)) {
+                $maxPorteiros = in_array($diaCulto, $diasTresPorteiros) ? 3 : 2;
+    
+                for ($week = 0; $week < 6; $week++) {
+                    // Aplica a porcentagem de aleatoriedade
+                    if (rand(0, 100) < $percentualAleatoriedade) {
+                        shuffle($porteirosDisponiveis); // Embaralha o array para seleção aleatória
+                    }
+                    // Seleciona até o número máximo de porteiros disponíveis para este dia de culto em cada semana
+                    $atribuicoes[$diaCulto][$week] = array_slice($porteirosDisponiveis, 0, $maxPorteiros);
+                }
+            }
+        }
+    
+        // Atribuição específica para "SundayR"
+        $atribuicoes['SundayR'] = [];
+        $porteirosDisponiveisSundayR = [];
+        foreach ($porteiros as $porteiro) {
+            if (in_array('SundayR', $porteiro['dias_trabalho'])) {
+                // Verifica se o porteiro não possui 'All' como um dos dias de trabalho
+                if (!in_array('All', $porteiro['dias_trabalho'])) {
+                    $porteirosDisponiveisSundayR[] = $porteiro['nome'];
+                }
+            }
+        }
+    
+        if (!empty($porteirosDisponiveisSundayR)) {
+            for ($week = 0; $week < 6; $week++) {
+                // Aplica a porcentagem de aleatoriedade
+                if (rand(0, 100) < $percentualAleatoriedade) {
+                    shuffle($porteirosDisponiveisSundayR); // Embaralha os porteiros disponíveis
+                }
+    
+                // Seleciona exatamente dois porteiros disponíveis para este dia de culto em cada semana
+                $atribuicoes['SundayR'][$week] = array_slice($porteirosDisponiveisSundayR, 0, 2);
+    
+                // Garante que haja sempre dois porteiros atribuídos ao SundayR
+                if (count($atribuicoes['SundayR'][$week]) < 2) {
+                    $outrosPorteiros = array_diff($porteirosDisponiveisSundayR, $atribuicoes['SundayR'][$week]);
+                    shuffle($outrosPorteiros);
+                    $atribuicoes['SundayR'][$week] = array_merge($atribuicoes['SundayR'][$week], array_slice($outrosPorteiros, 0, 2 - count($atribuicoes['SundayR'][$week])));
+                }
+            }
+        } else {
+            // Caso não haja porteiros disponíveis para SundayR, definir como vazio
+            for ($week = 0; $week < 6; $week++) {
+                $atribuicoes['SundayR'][$week] = [];
+            }
+        }
+    
+        // Aplicar regra para evitar que o mesmo porteiro "All" seja atribuído tanto no Domingo quanto no DomingoR
+        foreach ($atribuicoes['SundayR'] as $week => $porteirosSundayR) {
+            foreach ($porteirosSundayR as $porteiro) {
+                if (in_array($porteiro, $atribuicoes['Sunday'][$week] ?? [])) {
+                    // Encontrou duplicação, precisa substituir por outro disponível
+                    $porteirosDisponiveisSundayR = array_diff($porteirosDisponiveisSundayR, [$porteiro]);
+                    if (!empty($porteirosDisponiveisSundayR)) {
+                        shuffle($porteirosDisponiveisSundayR); // Embaralha os porteiros disponíveis
+                        $novoPorteiro = reset($porteirosDisponiveisSundayR); // Pega o primeiro porteiro disponível
+                        $atribuicoes['SundayR'][$week] = [$novoPorteiro]; // Substitui pelo novo porteiro
+                    }
+                }
+            }
+        }
+    
+        return $atribuicoes;
+    }
